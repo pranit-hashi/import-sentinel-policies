@@ -1,0 +1,60 @@
+# Prevents any destructive changes during Terraform runs.
+# Specifically blocks:
+#   - "delete"            -> resource is destroyed
+#   - ["delete","create"] -> resource is replaced (destroy + recreate)
+#   - ["create","delete"] -> resource is replaced (create + destroy)
+#
+# Intended enforcement: hard-mandatory
+
+import "tfplan/v2" as tfplan
+import "strings"
+
+# Actions that are considered destructive
+destructive_actions = [
+    ["delete"],
+    ["delete", "create"],
+    ["create", "delete"],
+]
+
+# Helper: compare two action lists for equality
+actions_equal = func(a, b) {
+    if length(a) is not length(b) {
+        return false
+    }
+    for a as i, v {
+        if v is not b[i] {
+            return false
+        }
+    }
+    return true
+}
+
+# Find all resource changes that match a destructive action set
+destructive_changes = filter tfplan.resource_changes as _, rc {
+    any destructive_actions as da {
+        actions_equal(rc.change.actions, da)
+    }
+}
+
+# Emit a clear violation message per offending resource
+print_violations = func() {
+    for destructive_changes as addr, rc {
+        print(strings.join([
+            "Destructive change detected:",
+            "  address: " + addr,
+            "  type:    " + rc.type,
+            "  action:  " + strings.join(rc.change.actions, ","),
+        ], "\n"))
+    }
+}
+
+violation_count = length(destructive_changes)
+
+if violation_count > 0 {
+    print("Found", violation_count, "destructive change(s). Imports must not destroy or replace existing resources.")
+    print_violations()
+}
+
+main = rule {
+    violation_count is 0
+}
