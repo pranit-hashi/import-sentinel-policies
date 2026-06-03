@@ -1,0 +1,54 @@
+# Flags any in-place updates to existing resources.
+# During imports, the expectation is that resources are brought into
+# state without modification. Updates may indicate config drift
+# between the imported resource and the generated Terraform code.
+#
+# Intended enforcement: soft-mandatory
+
+import "tfplan/v2" as tfplan
+import "strings"
+
+# Actions that represent in-place updates
+update_actions = [
+    ["update"],
+]
+
+actions_equal = func(a, b) {
+    if length(a) is not length(b) {
+        return false
+    }
+    for a as i, v {
+        if v is not b[i] {
+            return false
+        }
+    }
+    return true
+}
+
+updated_resources = filter tfplan.resource_changes as _, rc {
+    any update_actions as ua {
+        actions_equal(rc.change.actions, ua)
+    }
+}
+
+print_warnings = func() {
+    for updated_resources as addr, rc {
+        print(strings.join([
+            "Update detected (review required):",
+            "  address: " + addr,
+            "  type:    " + rc.type,
+            "  action:  " + strings.join(rc.change.actions, ","),
+        ], "\n"))
+    }
+}
+
+update_count = length(updated_resources)
+
+if update_count > 0 {
+    print("Found", update_count, "in-place update(s). Verify these are intentional during import.")
+    print_warnings()
+}
+
+main = rule {
+    update_count is 0
+}
