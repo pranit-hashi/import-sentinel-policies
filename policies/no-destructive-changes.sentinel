@@ -46,6 +46,7 @@ print_violations = func() {
             "  action:  " + strings.join(rc.change.actions, ","),
         ], "\n"))
     }
+    return true
 }
 
 violation_count = length(destructive_changes)
