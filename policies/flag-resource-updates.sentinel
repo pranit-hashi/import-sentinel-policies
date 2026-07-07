@@ -40,6 +40,7 @@ print_warnings = func() {
             "  action:  " + strings.join(rc.change.actions, ","),
         ], "\n"))
     }
+    return true
 }
 
 update_count = length(updated_resources)
